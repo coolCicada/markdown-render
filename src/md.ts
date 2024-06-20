@@ -17,7 +17,7 @@ function tokenize(markdown: string): Token[] {
         blockquote: /^>\s+(.*)$/,
         codeBlock: /^```(\w*)$/,
         table: /^\|.*\|$/,
-        tableSeparator: /^\|-{3,}-*\|$/,
+        tableSeparator: /^\|(-{3,}\|)+$/,
         inlineCode: /`([^`]+)`/,
         bold: /\*\*(.*?)\*\*/g,
         italic: /\*(.*?)\*/g,
@@ -49,10 +49,10 @@ function tokenize(markdown: string): Token[] {
             } else if (regex.blockquote.test(line)) {
                 const match = line.match(regex.blockquote)!;
                 tokens.push(new Token('blockquote', match[1]));
-            } else if (regex.table.test(line)) {
-                tokens.push(new Token('tableRow', line));
             } else if (regex.tableSeparator.test(line)) {
                 tokens.push(new Token('tableSeparator', ''));
+            } else if (regex.table.test(line)) {
+                tokens.push(new Token('tableRow', line));
             } else {
                 tokens.push(new Token('paragraph', line));
             }
@@ -65,7 +65,8 @@ function tokenize(markdown: string): Token[] {
 function parse(tokens: Token[]): MarkdownNode {
     const root = new MarkdownNode('root');
     let currentNode = root;
-    let tableBuffer: string[] = [];
+    let inTable = false;
+    let isTableHeader = false;
 
     tokens.forEach(token => {
         switch (token.type) {
@@ -78,6 +79,7 @@ function parse(tokens: Token[]): MarkdownNode {
             case 'paragraph':
             case 'blockquote':
             case 'hr':
+                currentNode = root;
                 currentNode.children.push(new MarkdownNode(token.type, token.value));
                 break;
             case 'listItem':
@@ -100,13 +102,18 @@ function parse(tokens: Token[]): MarkdownNode {
                 currentNode.children.push(new MarkdownNode('codeLine', token.value));
                 break;
             case 'tableRow':
-            case 'tableSeparator':
-                tableBuffer.push(token.value);
-                if (token.type === 'tableSeparator') {
-                    const tableNode = new MarkdownNode('table', tableBuffer.join('\n'));
-                    root.children.push(tableNode);
-                    tableBuffer = [];
+                if (!inTable) {
+                    inTable = true;
+                    isTableHeader = true;
+                    const tableNode = new MarkdownNode('table');
+                    console.log('currentNode:', currentNode);
+                    currentNode.children.push(tableNode);
+                    currentNode = tableNode;
                 }
+                currentNode.children.push(new MarkdownNode(isTableHeader ? 'tableHeader' : 'tableRow', token.value));
+                break;
+            case 'tableSeparator':
+                isTableHeader = false;
                 break;
             default:
                 throw new Error(`Unknown token type: ${token.type}`);
@@ -147,7 +154,7 @@ function render(node: MarkdownNode): string {
         case 'codeLine':
             return node.value;
         case 'table':
-            return renderTable(node.value);
+            return renderTable(node);
         default:
             throw new Error(`Unknown node type: ${node.type}`);
     }
@@ -162,7 +169,7 @@ function renderInline(text: string): string {
         image: /!\[([^\]]*)\]\(([^)]+)\)/g,
     };
 
-    text = text.replace(regex.image, '<img src="$2" alt="$1" />');
+    text = text.replace(regex.image, '<img width="100" src="$2" alt="$1" />');
     text = text.replace(regex.link, '<a href="$2">$1</a>');
     text = text.replace(regex.bold, '<strong>$1</strong>');
     text = text.replace(regex.italic, '<em>$1</em>');
@@ -171,15 +178,10 @@ function renderInline(text: string): string {
     return text;
 }
 
-function renderTable(tableText: string): string {
-    const lines = tableText.split('\n');
-    const headers = lines[0].split('|').map(header => header.trim());
-    const rows = lines.slice(2).map(line => line.split('|').map(cell => cell.trim()));
-
-    const headerHtml = headers.map(header => `<th>${header}</th>`).join('');
-    const rowsHtml = rows.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`).join('');
-
-    return `<table><thead><tr>${headerHtml}</tr></thead><tbody>${rowsHtml}</tbody></table>`;
+function renderTable(node: MarkdownNode): string {
+    const headerHtml = node.children[0].value.split('|').map(header => header.trim()).filter(Boolean).map(header => `<th>${header}</th>`);
+    const rowsHtml = node.children.slice(1).map(nt => `<tr>${nt.value.split('|').map(header => header.trim()).filter(Boolean).map(header => `<th>${header}</th>`).join('')}<tr>`)
+    return `<table border="1"><thead><tr>${headerHtml}</tr></thead><tbody>${rowsHtml}</tbody></table>`;
 }
 
 // 示例 Markdown 文本
@@ -187,7 +189,7 @@ const markdown = `
 # Title
 ## Subtitle
 ### Sub-subtitle
-This is a paragraph with **bold** and *italic* text, as well as a [link](http://example.com) and an image: ![alt text](https://i2.hdslb.com/bfs/face/3611dc2a0e59a13cb371d82acf2f97c2acc247cf.jpg@120w_120h_1c.avif).
+This is a paragraph with **bold** and *italic* text, as well as a [link](http://example.com) and an image: ![alt text](https://img2.baidu.com/it/u=4206823861,2043582464&fm=253&fmt=auto&app=120&f=JPEG?w=100&h=100).
 
 \`\`\`javascript
 console.log('Hello, world!');
@@ -209,9 +211,12 @@ console.log('Hello, world!');
 Another paragraph.
 `;
 
-// Tokenize, parse, and render the Markdown
-const tokens = tokenize(markdown);
-const ast = parse(tokens);
-const html = render(ast);
-
-console.log(html);
+export function getStr() {
+    // Tokenize, parse, and render the Markdown
+    const tokens = tokenize(markdown);
+    console.log('tokens:', tokens);
+    const ast = parse(tokens);
+    console.log('ast:', ast);
+    const html = render(ast);
+    return html;
+}
