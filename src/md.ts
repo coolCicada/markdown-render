@@ -1,3 +1,5 @@
+import Prism from 'prismjs';
+import 'prismjs/themes/prism.css';
 class Token {
     constructor(public type: string, public value: string) {}
 }
@@ -142,7 +144,7 @@ function render(node: MarkdownNode): string {
         case 'paragraph':
             return `<p>${renderInline(node.value)}</p>`;
         case 'blockquote':
-            return `<blockquote>${node.value}</blockquote>`;
+            return `<blockquote>${renderInline(node.value)}</blockquote>`;
         case 'hr':
             return `<hr />`;
         case 'list':
@@ -150,7 +152,11 @@ function render(node: MarkdownNode): string {
         case 'listItem':
             return `<li>${renderInline(node.value)}</li>`;
         case 'codeBlock':
-            return `<pre><code class="${node.value}">${node.children.map(render).join('\n')}</code></pre>`;
+            const language = node.value || 'plaintext';
+            const code = node.children.map(render).join('\n');
+            const highlightedCode = Prism.highlight(code, Prism.languages[language], language);
+            console.log('code:', code, highlightedCode)
+            return `<div class="code-block"><pre><code class="language-${language}">${highlightedCode}</code></pre></div>`;
         case 'codeLine':
             return node.value;
         case 'table':
@@ -169,7 +175,7 @@ function renderInline(text: string): string {
         image: /!\[([^\]]*)\]\(([^)]+)\)/g,
     };
 
-    text = text.replace(regex.image, '<img width="100" src="$2" alt="$1" />');
+    text = text.replace(regex.image, '<div style="height: 100px"><img style="height: 100%" src="$2" alt="$1" /><div>');
     text = text.replace(regex.link, '<a href="$2">$1</a>');
     text = text.replace(regex.bold, '<strong>$1</strong>');
     text = text.replace(regex.italic, '<em>$1</em>');

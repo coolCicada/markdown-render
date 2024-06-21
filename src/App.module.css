@@ -1,0 +1,40 @@
+.container {
+    display: flex;
+    height: 100vh;
+
+    textarea {
+        width: 600px;
+        border: none;
+        background-color: #f9f9f9;
+        font-family: Arial, sans-serif;
+        font-size: 18px;
+        line-height: 1.5;
+        padding: 10px;
+        color: #333;
+        outline: none;
+    }
+
+    .preview {
+        padding: 1px 20px;
+        flex: 1;
+        overflow-y: auto;
+
+        :global(blockquote) {
+            margin-left: 0;
+        }
+
+        :global(.code-block) {
+            background-color: antiquewhite;
+            padding: 10px;
+            border-radius: 10px;
+            pre {
+                [class*="language-"] {
+                    white-space: pre-wrap;
+                    word-wrap: break-word;
+                    word-break: break-all;
+                    overflow-wrap: break-word;
+                }
+            }
+        }
+    }
+}
