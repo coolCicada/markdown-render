@@ -13,8 +13,9 @@ function tokenize(markdown: string): Token[] {
     const regex = {
         header: /^(#{1,6})\s+(.*)$/,
         hr: /^-{3,}$/,
-        list: /^(\*|\d+\.)\s+(.*)$/,
+        list: /^\-{1}\s+(.*)$/,
         blockquote: /^>\s+(.*)$/,
+        mainInfoBlock: /^>{3}\s+(.*)$/,
         codeBlock: /^```(\w*)$/,
         table: /^\|.*\|$/,
         tableSeparator: /^\|(-{3,}\|)+$/,
@@ -45,8 +46,8 @@ function tokenize(markdown: string): Token[] {
                 tokens.push(new Token('hr', ''));
             } else if (regex.list.test(line)) {
                 const match = line.match(regex.list)!;
-                tokens.push(new Token('listItem', match[2]));
-            } else if (regex.blockquote.test(line)) {
+                tokens.push(new Token('listItem', match[1]));
+            }else if (regex.blockquote.test(line)) {
                 const match = line.match(regex.blockquote)!;
                 tokens.push(new Token('blockquote', match[1]));
             } else if (regex.tableSeparator.test(line)) {
@@ -65,10 +66,10 @@ function tokenize(markdown: string): Token[] {
 function parse(tokens: Token[]): MarkdownNode {
     const root = new MarkdownNode('root');
     let currentNode = root;
-    let inTable = false;
     let isTableHeader = false;
 
     tokens.forEach(token => {
+
         switch (token.type) {
             case 'header1':
             case 'header2':
@@ -102,8 +103,7 @@ function parse(tokens: Token[]): MarkdownNode {
                 currentNode.children.push(new MarkdownNode('codeLine', token.value));
                 break;
             case 'tableRow':
-                if (!inTable) {
-                    inTable = true;
+                if (currentNode.type !== 'table') {
                     isTableHeader = true;
                     const tableNode = new MarkdownNode('table');
                     console.log('currentNode:', currentNode);
@@ -179,39 +179,13 @@ function renderInline(text: string): string {
 }
 
 function renderTable(node: MarkdownNode): string {
-    const headerHtml = node.children[0].value.split('|').map(header => header.trim()).filter(Boolean).map(header => `<th>${header}</th>`);
-    const rowsHtml = node.children.slice(1).map(nt => `<tr>${nt.value.split('|').map(header => header.trim()).filter(Boolean).map(header => `<th>${header}</th>`).join('')}<tr>`)
-    return `<table border="1"><thead><tr>${headerHtml}</tr></thead><tbody>${rowsHtml}</tbody></table>`;
+    const headerHtml = node.children[0].value.split('|').map(header => header.trim()).filter(Boolean).map(header => `<th>${header}</th>`).join('');
+    console.log('headerHtml:', headerHtml);
+    const rowsHtml = node.children.slice(1).map(nt => `<tr>${nt.value.split('|').map(header => header.trim()).filter(Boolean).map(header => `<td>${header}</td>`).join('')}<tr>`).join('')
+    return `<table><thead><tr>${headerHtml}</tr></thead><tbody>${rowsHtml}</tbody></table>`;
 }
 
-// 示例 Markdown 文本
-const markdown = `
-# Title
-## Subtitle
-### Sub-subtitle
-This is a paragraph with **bold** and *italic* text, as well as a [link](http://example.com) and an image: ![alt text](https://img2.baidu.com/it/u=4206823861,2043582464&fm=253&fmt=auto&app=120&f=JPEG?w=100&h=100).
-
-\`\`\`javascript
-console.log('Hello, world!');
-\`\`\`
-
-- List item 1
-- List item 2
-- List item 3
-
-> This is a blockquote.
-
-| Header1 | Header2 | Header3 |
-|---------|---------|---------|
-| Cell1   | Cell2   | Cell3   |
-| Cell4   | Cell5   | Cell6   |
-
----
-
-Another paragraph.
-`;
-
-export function getStr() {
+export function getStr(markdown: string) {
     // Tokenize, parse, and render the Markdown
     const tokens = tokenize(markdown);
     console.log('tokens:', tokens);
